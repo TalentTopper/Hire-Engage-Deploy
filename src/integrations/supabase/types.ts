@@ -195,6 +195,7 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          resume_path: string
           updated_at: string
         }
         Insert: {
