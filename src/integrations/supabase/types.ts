@@ -195,13 +195,14 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
-          resume_path: string
+          resume_path: string | null
           updated_at: string
         }
         Insert: {
           college?: string
           created_at?: string
           full_name?: string
+          resume_path: string | null
           id: string
           updated_at?: string
         }
@@ -209,6 +210,7 @@ export type Database = {
           college?: string
           created_at?: string
           full_name?: string
+          resume_path: string | null
           id?: string
           updated_at?: string
         }
