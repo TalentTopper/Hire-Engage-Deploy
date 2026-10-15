@@ -1,0 +1,1081 @@
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardCheck,
+  FileCheck2,
+  FileText,
+  GraduationCap,
+  Hammer,
+  Loader2,
+  Menu,
+  RotateCcw,
+  Save,
+  ShieldCheck,
+  Upload,
+  UserRound,
+  X,
+} from "lucide-react";
+import { loadLogoDataUrl } from "@/lib/logo";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+
+export type ApplicationData = {
+  fullName: string;
+  email: string;
+  mobile: string;
+  city: string;
+  state: string;
+  qualificationType: string;
+  department: string;
+  graduationBatch: string;
+  score: string;
+  college: string;
+  university: string;
+  activeArrears: string;
+  arrearsCount: string;
+  currentStatus: string;
+  experience: string;
+  availability: string;
+  preferredRoles: string[];
+  workLocations: string[];
+  technicalSkills: string;
+  projects: string;
+  certifications: string;
+  internshipExperience: string;
+  assessmentWillingness: string;
+  hireTrainDeploy: string;
+  relocation: string;
+  resume: string;
+  marksheet: string;
+  declaration: boolean;
+};
+
+const emptyData: ApplicationData = {
+  fullName: "",
+  email: "",
+  mobile: "",
+  city: "",
+  state: "",
+  qualificationType: "",
+  department: "",
+  graduationBatch: "",
+  score: "",
+  college: "",
+  university: "",
+  activeArrears: "",
+  arrearsCount: "",
+  currentStatus: "",
+  experience: "",
+  availability: "",
+  preferredRoles: [],
+  workLocations: [],
+  technicalSkills: "",
+  projects: "",
+  certifications: "",
+  internshipExperience: "",
+  assessmentWillingness: "",
+  hireTrainDeploy: "",
+  relocation: "",
+  resume: "",
+  marksheet: "",
+  declaration: false,
+};
+
+const steps = [
+  ["Personal details", "Tell us who you are", UserRound],
+  ["Education", "Your academic journey", GraduationCap],
+  ["Employability", "Where you can make an impact", FileText],
+  ["Skills & work", "Show us what you build", Hammer],
+  ["Assessment", "Your path to selection", ClipboardCheck],
+  ["Documents", "Keep your profile credible", FileCheck2],
+  ["Declaration", "One last confident step", ShieldCheck],
+] as const;
+const roles = [
+  "Software development",
+  "Data & analytics",
+  "QA & testing",
+  "Cloud & DevOps",
+  "UI / UX engineering",
+];
+const locations = ["Bengaluru", "Hyderabad", "Pune", "Chennai", "Delhi NCR", "Open to relocation"];
+
+type Update = (key: keyof ApplicationData, value: string | string[] | boolean) => void;
+
+function Field({
+  label,
+  required,
+  error,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string | undefined;
+  children: ReactNode;
+}) {
+  return (
+    <div className="onboard-field">
+      <label>
+        {label}
+        {required && <span aria-label="required">*</span>}
+      </label>
+      {children}
+      {error && <p className="onboard-error">{error}</p>}
+    </div>
+  );
+}
+
+function Input({
+  id,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <input
+      id={id}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      type={type}
+    />
+  );
+}
+
+function Select({
+  id,
+  value,
+  onChange,
+  options,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+}) {
+  return (
+    <select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
+      <option value="">Select an option</option>
+      {options.map((option) => (
+        <option key={option}>{option}</option>
+      ))}
+    </select>
+  );
+}
+
+function Choice({
+  value,
+  onChange,
+  options,
+  multiple = false,
+}: {
+  value: string | string[];
+  onChange: (value: string | string[]) => void;
+  options: string[];
+  multiple?: boolean;
+}) {
+  return (
+    <div className="onboard-choices">
+      {options.map((option) => {
+        const selected = multiple ? (value as string[]).includes(option) : value === option;
+        return (
+          <button
+            type="button"
+            key={option}
+            className={selected ? "selected" : ""}
+            onClick={() =>
+              multiple
+                ? onChange(
+                    selected
+                      ? (value as string[]).filter((item) => item !== option)
+                      : [...(value as string[]), option],
+                  )
+                : onChange(option)
+            }
+          >
+            <span>{selected && <Check size={13} strokeWidth={3} />}</span>
+            {option}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function FileUpload({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+}) {
+  const handleFile = (event: ChangeEvent<HTMLInputElement>) =>
+    onChange(event.target.files?.[0]?.name ?? "");
+  return (
+    <label className={`onboard-upload ${value ? "has-file" : ""}`}>
+      <input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={handleFile} />
+      {value ? <CheckCircle2 size={20} /> : <Upload size={20} />}
+      <span>
+        <strong>{value || label}</strong>
+        <small>{value ? "Selected and ready to attach" : "PDF, DOC, DOCX, JPG or PNG"}</small>
+      </span>
+    </label>
+  );
+}
+
+function StepContent({
+  step,
+  data,
+  update,
+  errors,
+}: {
+  step: number;
+  data: ApplicationData;
+  update: Update;
+  errors: Record<string, string>;
+}) {
+  const error = (key: keyof ApplicationData) => errors[key];
+  if (step === 0)
+    return (
+      <div className="onboard-grid">
+        <Field label="Full name" required error={error("fullName")}>
+          <Input
+            id="fullName"
+            value={data.fullName}
+            onChange={(value) => update("fullName", value)}
+            placeholder="As it appears on official documents"
+          />
+        </Field>
+        <Field label="Email address" required error={error("email")}>
+          <Input
+            id="email"
+            type="email"
+            value={data.email}
+            onChange={(value) => update("email", value)}
+            placeholder="you@example.com"
+          />
+        </Field>
+        <Field label="Mobile number" required error={error("mobile")}>
+          <Input
+            id="mobile"
+            type="tel"
+            value={data.mobile}
+            onChange={(value) => update("mobile", value)}
+            placeholder="+91 98765 43210"
+          />
+        </Field>
+        <Field label="City" required error={error("city")}>
+          <Input
+            id="city"
+            value={data.city}
+            onChange={(value) => update("city", value)}
+            placeholder="Current city"
+          />
+        </Field>
+        <Field label="State" required error={error("state")}>
+          <Select
+            id="state"
+            value={data.state}
+            onChange={(value) => update("state", value)}
+            options={[
+              "Andhra Pradesh",
+              "Delhi NCR",
+              "Gujarat",
+              "Karnataka",
+              "Kerala",
+              "Maharashtra",
+              "Tamil Nadu",
+              "Telangana",
+              "Other",
+            ]}
+          />
+        </Field>
+      </div>
+    );
+  if (step === 1)
+    return (
+      <div className="onboard-grid">
+        <Field label="Qualification type" required error={error("qualificationType")}>
+          <Select
+            id="qualificationType"
+            value={data.qualificationType}
+            onChange={(value) => update("qualificationType", value)}
+            options={["B.E. / B.Tech", "BCA / MCA", "B.Sc. / M.Sc.", "Diploma", "Other"]}
+          />
+        </Field>
+        <Field label="Department / branch" required error={error("department")}>
+          <Input
+            id="department"
+            value={data.department}
+            onChange={(value) => update("department", value)}
+            placeholder="Computer Science, ECE..."
+          />
+        </Field>
+        <Field label="Graduation batch" required error={error("graduationBatch")}>
+          <Select
+            id="graduationBatch"
+            value={data.graduationBatch}
+            onChange={(value) => update("graduationBatch", value)}
+            options={["2022", "2023", "2024", "2025", "2026", "2027"]}
+          />
+        </Field>
+        <Field label="CGPA / percentage" required error={error("score")}>
+          <Input
+            id="score"
+            value={data.score}
+            onChange={(value) => update("score", value)}
+            placeholder="e.g. 8.4 CGPA or 76%"
+          />
+        </Field>
+        <Field label="College / institute" required error={error("college")}>
+          <Input id="college" value={data.college} onChange={(value) => update("college", value)} />
+        </Field>
+        <Field label="University / board" required error={error("university")}>
+          <Input
+            id="university"
+            value={data.university}
+            onChange={(value) => update("university", value)}
+          />
+        </Field>
+        <Field label="Do you have active arrears?" required error={error("activeArrears")}>
+          <Choice
+            value={data.activeArrears}
+            onChange={(value) => update("activeArrears", value)}
+            options={["Yes", "No"]}
+          />
+        </Field>
+        {data.activeArrears === "Yes" && (
+          <Field label="Number of active arrears" required error={error("arrearsCount")}>
+            <Input
+              id="arrearsCount"
+              type="number"
+              value={data.arrearsCount}
+              onChange={(value) => update("arrearsCount", value)}
+            />
+          </Field>
+        )}
+      </div>
+    );
+  if (step === 2)
+    return (
+      <div className="onboard-stack">
+        <div className="onboard-grid">
+          <Field label="Current status" required error={error("currentStatus")}>
+            <Select
+              id="currentStatus"
+              value={data.currentStatus}
+              onChange={(value) => update("currentStatus", value)}
+              options={[
+                "Student",
+                "Recently graduated",
+                "Working professional",
+                "Looking for an opportunity",
+              ]}
+            />
+          </Field>
+          <Field label="Previous experience" required error={error("experience")}>
+            <Select
+              id="experience"
+              value={data.experience}
+              onChange={(value) => update("experience", value)}
+              options={["No experience", "Less than 6 months", "6–12 months", "More than 1 year"]}
+            />
+          </Field>
+          <Field label="Availability to join" required error={error("availability")}>
+            <Select
+              id="availability"
+              value={data.availability}
+              onChange={(value) => update("availability", value)}
+              options={["Immediately", "Within 15 days", "Within 30 days", "After graduation"]}
+            />
+          </Field>
+        </div>
+        <Field label="Preferred roles" required error={error("preferredRoles")}>
+          <Choice
+            value={data.preferredRoles}
+            onChange={(value) => update("preferredRoles", value)}
+            options={roles}
+            multiple
+          />
+        </Field>
+        <Field label="Preferred work locations" required error={error("workLocations")}>
+          <Choice
+            value={data.workLocations}
+            onChange={(value) => update("workLocations", value)}
+            options={locations}
+            multiple
+          />
+        </Field>
+      </div>
+    );
+  if (step === 3)
+    return (
+      <div className="onboard-stack">
+        <Field label="Technical skills" required error={error("technicalSkills")}>
+          <textarea
+            value={data.technicalSkills}
+            onChange={(event) => update("technicalSkills", event.target.value)}
+            placeholder="Java, Python, SQL, React, Git..."
+          />
+        </Field>
+        <Field label="Projects" required error={error("projects")}>
+          <textarea
+            value={data.projects}
+            onChange={(event) => update("projects", event.target.value)}
+            placeholder="Project name, your role, technology used and outcome"
+          />
+        </Field>
+        <div className="onboard-grid">
+          <Field label="Certifications">
+            <textarea
+              value={data.certifications}
+              onChange={(event) => update("certifications", event.target.value)}
+            />
+          </Field>
+          <Field label="Internship experience">
+            <textarea
+              value={data.internshipExperience}
+              onChange={(event) => update("internshipExperience", event.target.value)}
+            />
+          </Field>
+        </div>
+      </div>
+    );
+  if (step === 4)
+    return (
+      <div className="onboard-stack">
+        <Field
+          label="Are you willing to complete the Talenttopper assessment?"
+          required
+          error={error("assessmentWillingness")}
+        >
+          <Choice
+            value={data.assessmentWillingness}
+            onChange={(value) => update("assessmentWillingness", value)}
+            options={["Yes, I am ready", "I would like more details"]}
+          />
+        </Field>
+        <Field
+          label="Would you consider a hire–train–deploy opportunity?"
+          required
+          error={error("hireTrainDeploy")}
+        >
+          <Choice
+            value={data.hireTrainDeploy}
+            onChange={(value) => update("hireTrainDeploy", value)}
+            options={["Yes, interested", "I prefer direct placement"]}
+          />
+        </Field>
+        <Field label="Are you open to relocation?" required error={error("relocation")}>
+          <Choice
+            value={data.relocation}
+            onChange={(value) => update("relocation", value)}
+            options={["Yes", "No", "Depending on the opportunity"]}
+          />
+        </Field>
+      </div>
+    );
+  if (step === 5)
+    return (
+      <div className="onboard-stack">
+        <Field label="Resume" required error={error("resume")}>
+          <FileUpload
+            value={data.resume}
+            onChange={(value) => update("resume", value)}
+            label="Upload your resume"
+          />
+        </Field>
+        <Field label="Latest marksheet">
+          <FileUpload
+            value={data.marksheet}
+            onChange={(value) => update("marksheet", value)}
+            label="Upload your latest marksheet"
+          />
+        </Field>
+      </div>
+    );
+  return (
+    <div className="onboard-stack">
+      <div className="onboard-info">
+        <ShieldCheck size={20} />
+        <p>
+          Review your answers, then confirm that the information shared is accurate and belongs to
+          you.
+        </p>
+      </div>
+      <label className={`onboard-declaration ${data.declaration ? "selected" : ""}`}>
+        <input
+          type="checkbox"
+          checked={data.declaration}
+          onChange={(event) => update("declaration", event.target.checked)}
+        />
+        <span>
+          <strong>I confirm that the information provided is true and complete.</strong>
+          <small>I understand that Talenttopper may contact me about this application.</small>
+        </span>
+      </label>
+      {error("declaration") && <p className="onboard-error">{error("declaration")}</p>}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Step rules                                                          */
+/* ------------------------------------------------------------------ */
+
+const requiredByStep: (keyof ApplicationData)[][] = [
+  ["fullName", "email", "mobile", "city", "state"],
+  [
+    "qualificationType",
+    "department",
+    "graduationBatch",
+    "score",
+    "college",
+    "university",
+    "activeArrears",
+  ],
+  ["currentStatus", "experience", "preferredRoles", "workLocations", "availability"],
+  ["technicalSkills", "projects"],
+  ["assessmentWillingness", "hireTrainDeploy", "relocation"],
+  ["resume"],
+  ["declaration"],
+];
+
+function stepIsComplete(data: ApplicationData, index: number) {
+  const keys = requiredByStep[index] ?? [];
+  const filled = keys.every((key) => {
+    const value = data[key];
+    return Array.isArray(value) ? value.length > 0 : Boolean(value);
+  });
+  if (index === 1 && data.activeArrears === "Yes" && !data.arrearsCount) return false;
+  return filled;
+}
+
+/* ------------------------------------------------------------------ */
+/* Mapping to what the dashboard server function accepts               */
+/* (fullName, college, education, skills, careerGoals, availability,   */
+/*  preferredTrack)                                                    */
+/* ------------------------------------------------------------------ */
+
+const ROLE_TO_TRACK: Record<string, string> = {
+  "Software development": "Full-Stack Web Development",
+  "Data & analytics": "Data Analytics",
+  "QA & testing": "Full-Stack Web Development",
+  "Cloud & DevOps": "Cloud & DevOps",
+  "UI / UX engineering": "UI/UX Design",
+};
+
+const clip = (text: string, max: number) => text.trim().slice(0, max);
+const joinParts = (parts: (string | undefined)[], separator: string) =>
+  parts
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(separator);
+
+export function mapWizardToApplication(data: ApplicationData) {
+  const education = joinParts(
+    [
+      data.qualificationType,
+      data.department,
+      data.graduationBatch ? `Batch ${data.graduationBatch}` : "",
+      data.score,
+      data.university,
+    ],
+    " · ",
+  );
+  const skills = joinParts(
+    [
+      data.technicalSkills,
+      data.projects ? `Projects: ${data.projects}` : "",
+      data.certifications ? `Certifications: ${data.certifications}` : "",
+      data.internshipExperience ? `Internship experience: ${data.internshipExperience}` : "",
+    ],
+    "\n\n",
+  );
+  const careerGoals = joinParts(
+    [
+      `Preferred roles: ${data.preferredRoles.join(", ")}`,
+      `Preferred locations: ${data.workLocations.join(", ")}`,
+      `Current status: ${data.currentStatus}; experience: ${data.experience}`,
+      `Hire-train-deploy: ${data.hireTrainDeploy}`,
+      `Open to relocation: ${data.relocation}`,
+    ],
+    "\n",
+  );
+  const preferredTrack =
+    data.preferredRoles.map((role) => ROLE_TO_TRACK[role]).find(Boolean) ??
+    "Full-Stack Web Development";
+
+  return {
+    fullName: clip(data.fullName, 100),
+    college: clip(data.college, 160),
+    education: clip(education, 300),
+    skills: clip(skills, 2000),
+    careerGoals: clip(careerGoals, 2000),
+    availability: clip(data.availability, 100),
+    preferredTrack,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* The wizard                                                          */
+/* ------------------------------------------------------------------ */
+
+type WizardProps = {
+  userId: string;
+  email: string;
+  initial: {
+    profile?: { full_name?: string | null; college?: string | null } | null;
+    application?: unknown;
+  } | null;
+  pending: boolean;
+  error: Error | null;
+  onSubmit: (data: ApplicationData) => void;
+};
+
+const draftKey = (userId: string) => `talenttopper-onboarding-draft-${userId}`;
+
+export function ApplicationWizard({
+  userId,
+  email,
+  initial,
+  pending,
+  error,
+  onSubmit,
+}: WizardProps) {
+  const submittedBefore = Boolean(initial?.application);
+  const seed = (): ApplicationData => ({
+    ...emptyData,
+    fullName: initial?.profile?.full_name ?? "",
+    college: initial?.profile?.college ?? "",
+    email,
+  });
+
+  const [data, setData] = useState<ApplicationData>(seed);
+  const [step, setStep] = useState(0);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const wasPending = useRef(false);
+
+  useEffect(() => {
+    try {
+      const draft = JSON.parse(localStorage.getItem(draftKey(userId)) ?? "{}");
+      const base = seed();
+      const merged: ApplicationData = { ...base, ...draft };
+      if (!merged.fullName) merged.fullName = base.fullName;
+      if (!merged.college) merged.college = base.college;
+      if (!merged.email) merged.email = base.email;
+      setData(merged);
+    } catch {
+      /* Empty draft is fine. */
+    }
+    setHydrated(true);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(draftKey(userId), JSON.stringify(data));
+    } catch {
+      /* Storage unavailable: the draft just won't persist. */
+    }
+  }, [data, hydrated, userId]);
+
+  useEffect(() => {
+    if (pending) {
+      wasPending.current = true;
+      setSaved(false);
+    } else if (wasPending.current) {
+      wasPending.current = false;
+      if (!error) setSaved(true);
+    }
+  }, [pending, error]);
+
+  const update: Update = (key, value) => {
+    setSaved(false);
+    setData((current) => ({ ...current, [key]: value }));
+  };
+  const completed = steps.filter((_, index) => stepIsComplete(data, index)).length;
+
+  const validate = (target: number) => {
+    const next: Record<string, string> = {};
+    (requiredByStep[target] ?? []).forEach((key) => {
+      const value = data[key];
+      if (!value || (Array.isArray(value) && value.length === 0))
+        next[key] =
+          key === "declaration" ? "Please confirm the declaration." : "This field is required.";
+    });
+    if (target === 1 && data.activeArrears === "Yes" && !data.arrearsCount)
+      next["arrearsCount"] = "Please enter the number of arrears.";
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const reset = () => {
+    setData(seed());
+    setStep(0);
+    setErrors({});
+    setSaved(false);
+    try {
+      localStorage.removeItem(draftKey(userId));
+    } catch {
+      /* Nothing to clear. */
+    }
+  };
+
+  const [downloading, setDownloading] = useState(false);
+
+  async function downloadApplication() {
+    if (!submittedBefore || downloading) return;
+    setDownloading(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const logo = await loadLogoDataUrl();
+      const pdf = new jsPDF({ unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 16;
+      const valueX = margin + 62;
+      const valueWidth = pageWidth - margin - valueX;
+      let y = 16;
+
+      const ensureSpace = (needed: number) => {
+        if (y + needed > pageHeight - 16) {
+          pdf.addPage();
+          y = 16;
+        }
+      };
+
+      const sections: [string, [string, string][]][] = [
+        [
+          "Personal details",
+          [
+            ["Full name", data.fullName],
+            ["Email address", data.email],
+            ["Mobile number", data.mobile],
+            ["City", data.city],
+            ["State", data.state],
+          ],
+        ],
+        [
+          "Education",
+          [
+            ["Qualification type", data.qualificationType],
+            ["Department / branch", data.department],
+            ["Graduation batch", data.graduationBatch],
+            ["CGPA / percentage", data.score],
+            ["College / institute", data.college],
+            ["University / board", data.university],
+            [
+              "Active arrears",
+              data.activeArrears === "Yes" ? `Yes (${data.arrearsCount})` : data.activeArrears,
+            ],
+          ],
+        ],
+        [
+          "Employability",
+          [
+            ["Current status", data.currentStatus],
+            ["Previous experience", data.experience],
+            ["Availability to join", data.availability],
+            ["Preferred roles", data.preferredRoles.join(", ")],
+            ["Preferred locations", data.workLocations.join(", ")],
+          ],
+        ],
+        [
+          "Skills & work",
+          [
+            ["Technical skills", data.technicalSkills],
+            ["Projects", data.projects],
+            ["Certifications", data.certifications],
+            ["Internship experience", data.internshipExperience],
+          ],
+        ],
+        [
+          "Assessment",
+          [
+            ["Assessment willingness", data.assessmentWillingness],
+            ["Hire-train-deploy", data.hireTrainDeploy],
+            ["Open to relocation", data.relocation],
+          ],
+        ],
+        [
+          "Documents",
+          [
+            ["Resume", data.resume],
+            ["Latest marksheet", data.marksheet],
+          ],
+        ],
+        [
+          "Declaration",
+          [
+            [
+              "Confirmed",
+              data.declaration ? "Information provided is true and complete" : "Not confirmed",
+            ],
+          ],
+        ],
+      ];
+
+      if (logo) pdf.addImage(logo, "JPEG", margin, y, 14, 14);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(14);
+      pdf.setTextColor(4, 11, 22);
+      pdf.text("NxDigita", margin + 18, y + 6);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
+      pdf.setTextColor(90, 98, 110);
+      pdf.text("HIRE · ENGAGE · DEPLOY", margin + 18, y + 11);
+      y += 26;
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(20);
+      pdf.setTextColor(4, 11, 22);
+      pdf.text("Internship Application", margin, y);
+      y += 7;
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.setTextColor(90, 98, 110);
+      pdf.text(
+        `${data.fullName} · Submitted application · Downloaded ${new Date().toLocaleDateString("en-IN")}`,
+        margin,
+        y,
+      );
+      y += 6;
+      pdf.setDrawColor(255, 107, 0);
+      pdf.setLineWidth(0.8);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 9;
+
+      const measure = (label: string, value: string) => {
+        const labelLines: string[] = pdf.splitTextToSize(label, 56);
+        const valueLines: string[] = pdf.splitTextToSize(value || "Not provided", valueWidth);
+        return { labelLines, valueLines, total: Math.max(labelLines.length, valueLines.length) };
+      };
+
+      for (const [heading, rows] of sections) {
+        const first = rows[0] ? measure(rows[0][0], rows[0][1]) : null;
+        ensureSpace(6 + Math.min(first?.total ?? 1, 3) * 5 + 3);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(11);
+        pdf.setTextColor(255, 107, 0);
+        pdf.text(heading.toUpperCase(), margin, y);
+        y += 6;
+        for (const [label, value] of rows) {
+          const { labelLines, valueLines, total } = measure(label, value);
+          ensureSpace(Math.min(total, 3) * 5 + 3);
+          for (let i = 0; i < total; i++) {
+            ensureSpace(5);
+            const labelLine = labelLines[i];
+            const valueLine = valueLines[i];
+            if (labelLine) {
+              pdf.setFont("helvetica", "bold");
+              pdf.setFontSize(9);
+              pdf.setTextColor(90, 98, 110);
+              pdf.text(labelLine, margin, y);
+            }
+            if (valueLine) {
+              pdf.setFont("helvetica", "normal");
+              pdf.setFontSize(10);
+              pdf.setTextColor(4, 11, 22);
+              pdf.text(valueLine, valueX, y);
+            }
+            y += 5;
+          }
+          y += 3;
+        }
+        y += 4;
+      }
+
+      const safeName = data.fullName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "applicant";
+      pdf.save(`nxdigita-application-${safeName}.pdf`);
+    } finally {
+      setDownloading(false);
+    }
+  }
+  const current = steps[step] ?? steps[0];
+  const [title, helper, Icon] = current;
+
+  return (
+    <div className="onboard-app">
+      <aside className="onboard-sidebar">
+  <div className="flex items-center gap-3 leading-none">
+  <img
+    src="/NXDIgita.jpeg"
+    alt="NxDigita"
+    className="size-10 shrink-0 rounded-md bg-white object-contain"
+  />
+  <span className="flex flex-col">
+    <span className="text-sm font-bold text-dark-foreground">NxDigita</span>
+    <span className="mt-1 text-[9px] font-medium tracking-[0.16em] text-dark-muted">
+      HIRE · ENGAGE · DEPLOY
+    </span>
+  </span>
+</div>
+
+        <p className="onboard-eyebrow">Six-month opportunity</p>
+        <h3 className="onboard-sidebar-title">Make your next move count.</h3>
+        <p className="onboard-sidebar-copy">
+          A complete profile helps the right teams discover your potential faster.
+        </p>
+        <div className="onboard-progress">
+          <span style={{ width: `${(completed / steps.length) * 100}%` }} />
+        </div>
+        <small>
+          {completed} of {steps.length} sections complete
+        </small>
+        <nav>
+          {steps.map(([label, description, StepIcon], index) => (
+            <button
+              type="button"
+              key={label}
+              className={index === step ? "active" : ""}
+              onClick={() => {
+                if (index <= step || validate(step)) setStep(index);
+              }}
+            >
+              <span>
+                {stepIsComplete(data, index) ? <Check size={14} /> : <StepIcon size={15} />}
+              </span>
+              <b>
+                {label}
+                <small>{description}</small>
+              </b>
+              {index === step && <ChevronRight size={16} />}
+            </button>
+          ))}
+        </nav>
+      </aside>
+      <div className="onboard-main">
+        <header className="onboard-topbar">
+          <button
+            type="button"
+            className="onboard-menu-button"
+            aria-label="Toggle sections"
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
+            {menuOpen ? <X size={19} /> : <Menu size={19} />}
+          </button>
+          <span>
+            <ShieldCheck size={15} /> Secure application workspace
+          </span>
+          <div>
+            <button
+              type="button"
+              className="onboard-download"
+              onClick={downloadApplication}
+              disabled={!submittedBefore || downloading}
+              title={
+                submittedBefore
+                  ? "Download your application"
+                  : "Submit your application to enable download"
+              }
+              aria-label="Download application"
+            >
+              {downloading ? <Loader2 size={15} className="onboard-spin" /> : <Save size={15} />}
+            </button>{" "}
+            <button type="button" onClick={reset}>
+              <RotateCcw size={13} /> Reset
+            </button>
+          </div>
+        </header>
+        {menuOpen && (
+          <nav className="onboard-mobile-steps">
+            {steps.map(([label], index) => (
+              <button
+                type="button"
+                key={label}
+                onClick={() => {
+                  setStep(index);
+                  setMenuOpen(false);
+                }}
+              >
+                {index + 1}. {label}
+              </button>
+            ))}
+          </nav>
+        )}
+        {saved ? (
+          <p className="onboard-notice is-success" role="status">
+            <CheckCircle2 size={16} /> Application saved. You can keep updating it while it is under
+            review.
+          </p>
+        ) : submittedBefore ? (
+          <p className="onboard-notice" role="status">
+            <CheckCircle2 size={16} /> Your application has been submitted. Submitting again will
+            update it.
+          </p>
+        ) : null}
+        <div className="onboard-heading">
+          <div>
+            <p className="onboard-eyebrow">
+              <Icon size={15} /> Section {String(step + 1).padStart(2, "0")}
+            </p>
+            <h3 className="onboard-title">{title}</h3>
+            <p>
+              {helper}. Fields marked <span>*</span> are required.
+            </p>
+          </div>
+          <strong>{Math.round(((step + 1) / steps.length) * 100)}%</strong>
+        </div>
+        <section className="onboard-card">
+          <StepContent step={step} data={data} update={update} errors={errors} />
+        </section>
+        {error && <p className="onboard-error onboard-submit-error">{error.message}</p>}
+        <footer className="onboard-actions">
+          <button
+            type="button"
+            onClick={() => {
+              setErrors({});
+              setStep(Math.max(0, step - 1));
+            }}
+            disabled={step === 0 || pending}
+          >
+            <ArrowLeft size={17} /> Previous
+          </button>
+          {step < steps.length - 1 ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (validate(step)) setStep(step + 1);
+              }}
+            >
+              Continue <ArrowRight size={17} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                if (validate(step)) onSubmit(data);
+              }}
+            >
+              {pending ? (
+                <Loader2 size={17} className="onboard-spin" />
+              ) : (
+                <CheckCircle2 size={17} />
+              )}
+              {pending
+                ? "Submitting…"
+                : submittedBefore
+                  ? "Update application"
+                  : "Submit application"}
+            </button>
+          )}
+        </footer>
+      </div>
+    </div>
+  );
+}
