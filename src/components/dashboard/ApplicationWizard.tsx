@@ -19,7 +19,11 @@ import {
   X,
 } from "lucide-react";
 import { loadLogoDataUrl } from "@/lib/logo";
+import { uploadResume } from "@/lib/intern-dashboard.functions";
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { debug } from "console";
+
+(window as any).testUpload = uploadResume;
 
 export type ApplicationData = {
   fullName: string;
@@ -140,13 +144,15 @@ function Input({
   type?: string;
 }) {
   return (
-    <input
-      id={id}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder={placeholder}
-      type={type}
-    />
+    <>
+      <input
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        type={type}
+      />
+    </>
   );
 }
 
@@ -214,22 +220,112 @@ function FileUpload({
   value,
   onChange,
   label,
+  // onUpload,
+  // isUploading,
 }: {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, size: number) => void;
   label: string;
+  // onUpload: (file: File) => Promise<void>;
+  // isUploading: boolean;
+  // setIsUploading:true;
 }) {
-  const handleFile = (event: ChangeEvent<HTMLInputElement>) =>
-    onChange(event.target.files?.[0]?.name ?? "");
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
+  //   try {
+  //     setIsUploading(true);
+  //     const file = event.target.files?.[0];
+  //     console.log(file);
+  //     if (!file) return;
+  //     onChange(file.name);
+
+  //     // upload resume on storage
+  //     const data = {
+  //       file,
+  //       fileName: file.name,
+  //       fileType: file.type,
+  //     };
+  //     uploadResume();
+  //     // const {url} = await uploadResume({ data });
+  //     // console.log(url)
+  //   } catch (e) {
+  //     console.log(e);
+  //   } finally {
+  //     setIsUploading(false);
+  //   }
+
+  //   // await onUpload(file);
+  // };
+
+  function handleResumeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    // onChange(e.target.value)
+    if (!formRef.current) return;
+
+    const formData = new FormData(formRef.current);
+    const file = formData.get("resume") as File;
+
+    if (!file) {
+      // TODO: change this to error message on frontend.
+      console.log("No File selected");
+      return;
+    }
+
+    // Checking valid format type.
+    const allowedExtensions = /\.(pdf|doc|docx)$/i;
+
+    if (!allowedExtensions.test(file.name)) {
+      // TODO: change this to error message on frontend.
+      alert("Only PDF, DOC, and DOCX files are allowed.");
+      formData.delete("resume"); // Clear the invalid selection
+      return;
+    }
+
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      alert("Only files under 5mb are allowed.");
+      return;
+    }
+    onChange(file.name, file.size);
+    console.log("Extracted file:", file.name, file.size);
+
+    formRef.current.requestSubmit();
+  }
+
+  async function handleResumeSubmit(e: React.SubmitEvent<HTMLFormElement>) {
+    try {
+      setIsUploading(true);
+      console.log("Form submitted");
+      e.preventDefault();
+      const formData = new FormData(e.currentTarget);
+      const { ok, url } = await uploadResume({ data: formData });
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
   return (
-    <label className={`onboard-upload ${value ? "has-file" : ""}`}>
-      <input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={handleFile} />
-      {value ? <CheckCircle2 size={20} /> : <Upload size={20} />}
-      <span>
-        <strong>{value || label}</strong>
-        <small>{value ? "Selected and ready to attach" : "PDF, DOC, DOCX, JPG or PNG"}</small>
-      </span>
-    </label>
+    <>
+      <form ref={formRef} onSubmit={handleResumeSubmit}>
+        <label className={`onboard-upload ${value ? "has-file" : ""}`}>
+          <input name="resume" type="file" accept=".pdf,.doc,.docx" onChange={handleResumeChange} />
+          {isUploading ? (
+            <Loader2 size={20} className="onboard-spin" />
+          ) : value ? (
+            <CheckCircle2 size={20} />
+          ) : (
+            <Upload size={20} />
+          )}
+          <span>
+            <strong>{value || label}</strong>
+            <small>{value ? "Selected and uploaded" : "PDF, DOC or DOCX"}</small>
+          </span>
+        </label>
+      </form>
+    </>
   );
 }
 
@@ -238,22 +334,51 @@ function StepContent({
   data,
   update,
   errors,
+  onResumeUpload,
+  isUploadingResume,
 }: {
   step: number;
   data: ApplicationData;
   update: Update;
   errors: Record<string, string>;
+  onResumeUpload: (file: File) => Promise<void>;
+  isUploadingResume: boolean;
 }) {
   const error = (key: keyof ApplicationData) => errors[key];
   if (step === 0)
     return (
       <div className="onboard-grid">
         <Field label="Full name" required error={error("fullName")}>
+          {/* <button
+            onClick={async () => {
+              const blob = new Blob(["Test content"], { type: "application/pdf" });
+              const file = new File([blob], "test.pdf", { type: "application/pdf" });
+              try {
+                await uploadResume({
+                  data: { file, fileName: "test.pdf", fileType: "application/pdf" },
+                });
+                alert("Success!");
+              } catch (e) {
+                alert("Error: " + e);
+              }
+            }}
+            style={{
+              position: "fixed",
+              top: 0,
+              right: 0,
+              zIndex: 9999,
+              background: "red",
+              color: "white",
+            }}
+          >
+            TEST UPLOAD
+          </button> */}
+
           <Input
             id="fullName"
             value={data.fullName}
             onChange={(value) => update("fullName", value)}
-            placeholder="As it appears on official documents"
+            placeholder="As it appears on official kok documents"
           />
         </Field>
         <Field label="Email address" required error={error("email")}>
@@ -491,7 +616,7 @@ function StepContent({
         <Field label="Resume" required error={error("resume")}>
           <FileUpload
             value={data.resume}
-            onChange={(value) => update("resume", value)}
+            onChange={(value, size) => update("resume", [value, String(size)])}
             label="Upload your resume"
           />
         </Field>
@@ -918,21 +1043,20 @@ export function ApplicationWizard({
     <div className="onboard-app">
       <aside className="onboard-sidebar">
         {/* <span className="onboard-logo">Talenttopper</span> */}
-  <div className="flex items-center gap-3 leading-none">
-  <img
-    src="/NXDIgita.jpeg"
-    alt="NxDigita"
-    className="size-10 shrink-0 rounded-md bg-white object-contain"
-  />
-  <span className="flex flex-col">
-    <span className="text-sm font-bold text-dark-foreground">NxDigita</span>
-    <span className="mt-1 text-[9px] font-medium tracking-[0.16em] text-dark-muted">
-      HIRE · ENGAGE · DEPLOY
-    </span>
-  </span>
-</div>
+        <div className="flex items-center gap-3 leading-none">
+          <img
+            src="/NXDIgita.jpeg"
+            alt="NxDigita"
+            className="size-10 shrink-0 rounded-md bg-white object-contain"
+          />
+          <span className="flex flex-col">
+            <span className="text-sm font-bold text-dark-foreground">NxDigita</span>
+            <span className="mt-1 text-[9px] font-medium tracking-[0.16em] text-dark-muted">
+              HIRE · ENGAGE · DEPLOY
+            </span>
+          </span>
+        </div>
 
-        
         <p className="onboard-eyebrow">Six-month opportunity</p>
         <h3 className="onboard-sidebar-title">Make your next move count.</h3>
         <p className="onboard-sidebar-copy">
