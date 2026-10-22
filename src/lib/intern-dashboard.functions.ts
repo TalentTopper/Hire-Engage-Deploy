@@ -39,6 +39,8 @@ export const uploadResume = createServerFn({ method: "POST" })
     const { formData } = data;
     const file = formData.get("resume") as File;
 
+    console.log(file)
+
     const fileName = file.name;
     const fileType = file.type;
 
@@ -57,13 +59,13 @@ export const uploadResume = createServerFn({ method: "POST" })
       throw new Error(`Storage upload failed: ${uploadError.message}`);
     }
 
-    const {
-      data: { publicUrl },
-    } = supabaseAdmin.storage.from(bucketName).getPublicUrl(uploadData.path);
+    // const {
+    //   data: { publicUrl },
+    // } = supabaseAdmin.storage.from(bucketName).getPublicUrl(uploadData.path);
 
     const { error: profileError } = await context.supabase
       .from("profiles")
-      .update({ resume_path: publicUrl, updated_at: new Date().toISOString() })
+      .update({ resume_path: uploadData.path, updated_at: new Date().toISOString() })
       .eq("id", userId);
 
     if (profileError) {
@@ -73,7 +75,7 @@ export const uploadResume = createServerFn({ method: "POST" })
 
     return {
       ok: true,
-      url: publicUrl,
+      path: uploadData.path,
     };
   });
 
