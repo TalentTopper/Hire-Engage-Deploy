@@ -221,17 +221,17 @@ function FileUpload({
   onChange,
   label,
   // onUpload,
-  // isUploading,
+  isUploading,
+  setIsUploading,
 }: {
   value: string;
   onChange: (value: string, size: number) => void;
   label: string;
   // onUpload: (file: File) => Promise<void>;
-  // isUploading: boolean;
-  // setIsUploading:true;
+  isUploading: boolean;
+  setIsUploading: (state: boolean) => void;
 }) {
-  const [isUploading, setIsUploading] = useState<boolean>(false);
-  const formRef = useRef<HTMLFormElement>(null);
+  // const [isUploading, setIsUploading] = useState<boolean>(false); // TODO: move it up
 
   // const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
   //   try {
@@ -259,49 +259,54 @@ function FileUpload({
   //   // await onUpload(file);
   // };
 
-  function handleResumeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    // onChange(e.target.value)
-    if (!formRef.current) return;
+  // function handleResumeChange(e: React.ChangeEvent<HTMLInputElement>) {
+  //   // onChange(e.target.value)
+  //   if (!formRef.current) return;
 
-    const formData = new FormData(formRef.current);
-    const file = formData.get("resume") as File;
+  //   const formData = new FormData(formRef.current);
+  //   const file = formData.get("resume") as File;
 
-    if (!file) {
-      // TODO: change this to error message on frontend.
-      console.log("No File selected");
-      return;
-    }
+  //   if (!file) {
+  //     // TODO: change this to error message on frontend.
+  //     console.log("No File selected");
+  //     return;
+  //   }
 
-    // Checking valid format type.
-    const allowedExtensions = /\.(pdf|doc|docx)$/i;
+  //   // Checking valid format type.
+  //   const allowedExtensions = /\.(pdf|doc|docx)$/i;
 
-    if (!allowedExtensions.test(file.name)) {
-      // TODO: change this to error message on frontend.
-      alert("Only PDF, DOC, and DOCX files are allowed.");
-      formData.delete("resume"); // Clear the invalid selection
-      return;
-    }
+  //   if (!allowedExtensions.test(file.name)) {
+  //     // TODO: change this to error message on frontend.
+  //     alert("Only PDF, DOC, and DOCX files are allowed.");
+  //     formData.delete("resume"); // Clear the invalid selection
+  //     return;
+  //   }
 
-    const MAX_FILE_SIZE = 5 * 1024 * 1024;
-    if (file.size > MAX_FILE_SIZE) {
-      alert("Only files under 5mb are allowed.");
-      return;
-    }
-    onChange(file.name, file.size);
-    console.log("Extracted file:", file.name, file.size);
+  //   const MAX_FILE_SIZE = 5 * 1024 * 1024;
+  //   if (file.size > MAX_FILE_SIZE) {
+  //     alert("Only files under 5mb are allowed.");
+  //     return;
+  //   }
+  //   onChange(file.name, file.size);
+  //   console.log("Extracted file:", file.name, file.size);
 
-    formRef.current.requestSubmit();
-  }
+  //   formRef.current.requestSubmit();
+  // }
 
-  async function handleResumeSubmit(e: React.SubmitEvent<HTMLFormElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target["files"]?.[0];
+    if (!file) return;
     try {
       setIsUploading(true);
-      console.log("Form submitted");
-      e.preventDefault();
-      const formData = new FormData(e.currentTarget);
-      const { ok, url } = await uploadResume({ data: formData });
+      const formData = new FormData();
+      formData.append("resume", file);
+      formData.append("name", file.name);
+      onChange(file.name, file.size);
+      const { ok, path } = await uploadResume({ data: formData }); // TODO: Change function name to uploadFile
+      // console.log(path);
+      // console.log("RESUME UPLOADED!");
     } catch (e) {
-      console.log(e);
+      console.error(e);
     } finally {
       setIsUploading(false);
     }
@@ -309,22 +314,25 @@ function FileUpload({
 
   return (
     <>
-      <form ref={formRef} onSubmit={handleResumeSubmit}>
-        <label className={`onboard-upload ${value ? "has-file" : ""}`}>
-          <input name="resume" type="file" accept=".pdf,.doc,.docx" onChange={handleResumeChange} />
-          {isUploading ? (
-            <Loader2 size={20} className="onboard-spin" />
-          ) : value ? (
-            <CheckCircle2 size={20} />
-          ) : (
-            <Upload size={20} />
-          )}
-          <span>
-            <strong>{value || label}</strong>
-            <small>{value ? "Selected and uploaded" : "PDF, DOC or DOCX"}</small>
-          </span>
-        </label>
-      </form>
+      <label className={`onboard-upload ${value ? "has-file" : ""}`}>
+        <input
+          name="resume"
+          type="file"
+          accept=".pdf,.doc,.docx"
+          onChange={(e) => handleFileChange(e)}
+        />
+        {isUploading ? (
+          <Loader2 size={20} className="onboard-spin" />
+        ) : value ? (
+          <CheckCircle2 size={20} />
+        ) : (
+          <Upload size={20} />
+        )}
+        <span>
+          <strong>{value || label}</strong>
+          <small>{value ? "Selected and uploaded" : "PDF, DOC or DOCX"}</small>
+        </span>
+      </label>
     </>
   );
 }
@@ -336,6 +344,7 @@ function StepContent({
   errors,
   onResumeUpload,
   isUploadingResume,
+  setIsUploadingResume
 }: {
   step: number;
   data: ApplicationData;
@@ -343,37 +352,13 @@ function StepContent({
   errors: Record<string, string>;
   onResumeUpload: (file: File) => Promise<void>;
   isUploadingResume: boolean;
+  setIsUploadingResume: (state: boolean) => void;
 }) {
   const error = (key: keyof ApplicationData) => errors[key];
   if (step === 0)
     return (
       <div className="onboard-grid">
         <Field label="Full name" required error={error("fullName")}>
-          {/* <button
-            onClick={async () => {
-              const blob = new Blob(["Test content"], { type: "application/pdf" });
-              const file = new File([blob], "test.pdf", { type: "application/pdf" });
-              try {
-                await uploadResume({
-                  data: { file, fileName: "test.pdf", fileType: "application/pdf" },
-                });
-                alert("Success!");
-              } catch (e) {
-                alert("Error: " + e);
-              }
-            }}
-            style={{
-              position: "fixed",
-              top: 0,
-              right: 0,
-              zIndex: 9999,
-              background: "red",
-              color: "white",
-            }}
-          >
-            TEST UPLOAD
-          </button> */}
-
           <Input
             id="fullName"
             value={data.fullName}
@@ -618,6 +603,8 @@ function StepContent({
             value={data.resume}
             onChange={(value, size) => update("resume", [value, String(size)])}
             label="Upload your resume"
+            isUploading={isUploadingResume}
+            setIsUploading={setIsUploadingResume}
           />
         </Field>
         <Field label="Latest marksheet">
@@ -785,7 +772,7 @@ export function ApplicationWizard({
     college: initial?.profile?.college ?? "",
     email,
   });
-
+  const [isUploadingResume, setIsUploadingResume] = useState<boolean>(false);
   const [data, setData] = useState<ApplicationData>(seed);
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -1163,7 +1150,14 @@ export function ApplicationWizard({
           <strong>{Math.round(((step + 1) / steps.length) * 100)}%</strong>
         </div>
         <section className="onboard-card">
-          <StepContent step={step} data={data} update={update} errors={errors} />
+          <StepContent
+            step={step}
+            data={data}
+            update={update}
+            errors={errors}
+            isUploadingResume={isUploadingResume}
+            setIsUploadingResume={setIsUploadingResume}
+          />
         </section>
         {error && <p className="onboard-error onboard-submit-error">{error.message}</p>}
         <footer className="onboard-actions">
@@ -1183,6 +1177,8 @@ export function ApplicationWizard({
               onClick={() => {
                 if (validate(step)) setStep(step + 1);
               }}
+              // disabled={true}
+              disabled={isUploadingResume}
             >
               Continue <ArrowRight size={17} />
             </button>

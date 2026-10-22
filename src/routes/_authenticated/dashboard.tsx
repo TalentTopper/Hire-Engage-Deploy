@@ -134,7 +134,7 @@ function Dashboard() {
         <main className="min-w-0 px-4 py-8 sm:px-8 lg:px-12 lg:py-10">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-primary">SAMPLE INTERN WORKSPACE</p>
+              <p className="text-sm font-medium text-primary">INTERN WORKSPACE</p>
               <h1 className="mt-2 text-3xl font-bold text-foreground">
                 Welcome
                 {dashboard.data?.profile?.full_name
@@ -241,7 +241,6 @@ function Dashboard() {
     </div>
   );
 }
-
 function Brand() {
   return (
     <Link to="/" className="flex items-center gap-3">
